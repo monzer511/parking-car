@@ -22,7 +22,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ data, onConfirm, onC
 
   const handlePay = () => {
     setStep('PROCESSING');
-    // Simulate API call or user processing time
+    // Simulate API call
     setTimeout(() => {
       setStep('SUCCESS');
     }, 2000);
@@ -30,6 +30,49 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ data, onConfirm, onC
 
   const handleFinalize = () => {
     onConfirm();
+  };
+
+  const handlePrint = () => {
+    // Create a simple print window logic
+    const printContent = `
+      <div style="direction: rtl; font-family: 'Courier New', monospace; text-align: center; width: 300px; padding: 20px;">
+        <h2 style="margin: 0;">SmartPark AI</h2>
+        <p style="margin: 5px 0 20px;">فاتورة موقف سيارات</p>
+        <hr style="border-top: 1px dashed #000;" />
+        <div style="display: flex; justify-content: space-between; margin: 10px 0;">
+           <span>رقم اللوحة:</span>
+           <strong>${data.plateNumber}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin: 10px 0;">
+           <span>الموقف:</span>
+           <strong>${data.slotLabel}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin: 10px 0;">
+           <span>الدخول:</span>
+           <span>${data.entryTime.toLocaleTimeString()}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin: 10px 0;">
+           <span>الخروج:</span>
+           <span>${data.exitTime.toLocaleTimeString()}</span>
+        </div>
+        <hr style="border-top: 1px dashed #000;" />
+        <div style="display: flex; justify-content: space-between; margin: 20px 0; font-size: 1.2em;">
+           <strong>الإجمالي:</strong>
+           <strong>${data.totalCost} SDG</strong>
+        </div>
+        <hr style="border-top: 1px dashed #000;" />
+        <p style="font-size: 0.8em; margin-top: 20px;">شكراً لاستخدامكم نظامنا الذكي</p>
+      </div>
+    `;
+
+    const printWindow = window.open('', '', 'width=400,height=600');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
+    }
   };
 
   if (step === 'SUCCESS') {
@@ -41,12 +84,21 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ data, onConfirm, onC
           </div>
           <h2 className="text-2xl font-bold text-slate-800 mb-2">تم السداد بنجاح</h2>
           <p className="text-slate-500 mb-8">تم فتح البوابة إلكترونياً. شكراً لاستخدامكم SmartPark.</p>
-          <button 
-            onClick={handleFinalize}
-            className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all"
-          >
-            إتمام وخروج
-          </button>
+          <div className="flex gap-3">
+            <button 
+              onClick={handlePrint}
+              className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-all flex items-center justify-center gap-2"
+            >
+              <Printer size={20} />
+              طباعة إيصال
+            </button>
+            <button 
+              onClick={handleFinalize}
+              className="flex-1 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all"
+            >
+              إتمام وخروج
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -145,7 +197,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ data, onConfirm, onC
                 'تأكيد السداد وفتح البوابة'
               )}
             </button>
-            <button className="px-4 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors">
+            <button 
+              onClick={handlePrint}
+              className="px-4 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors"
+              title="طباعة إيصال مبدئي"
+            >
               <Printer size={24} />
             </button>
           </div>

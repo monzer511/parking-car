@@ -53,10 +53,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLaunch }) => {
         
         <div className="max-w-7xl mx-auto px-6 relative z-10 flex flex-col md:flex-row items-center gap-12">
           <div className="flex-1 text-center md:text-right">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-400/20 rounded-full text-blue-300 mb-6">
-              <Sparkles size={16} />
-              <span>مدعوم بالذكاء الاصطناعي Gemini 2.5</span>
-            </div>
+            
             <h1 className="text-5xl md:text-7xl font-bold leading-tight mb-6">
               مستقبل إدارة <br/>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">مواقف السيارات</span>

@@ -12,11 +12,24 @@ import { Car, DollarSign, Activity, CheckIcon, TrendingUp, Clock, AlertCircle } 
 
 const TOTAL_SLOTS = 24;
 
+// Helper to load from local storage
+const loadFromStorage = (key: string, fallback: any) => {
+  const stored = localStorage.getItem(key);
+  if (!stored) return fallback;
+  try {
+    return JSON.parse(stored);
+  } catch (e) {
+    return fallback;
+  }
+};
+
 export default function App() {
   const [showLandingPage, setShowLandingPage] = useState(true);
   const [currentView, setCurrentView] = useState('dashboard');
   const [userRole, setUserRole] = useState<UserRole>('ADMIN');
-  const [minuteRate, setMinuteRate] = useState(10); // Default 10 SDG per minute
+  
+  // Load settings from storage or default
+  const [minuteRate, setMinuteRate] = useState(() => loadFromStorage('parking_rate', 10));
 
   const [slots, setSlots] = useState<ParkingSlot[]>([]);
   const [transactions, setTransactions] = useState<ParkingTransaction[]>([]);
@@ -25,21 +38,61 @@ export default function App() {
   // Payment State
   const [pendingPayment, setPendingPayment] = useState<any | null>(null);
 
-  // Initialize slots
+  // Initialize slots (Load from storage OR create new random ones if first time)
   useEffect(() => {
-    const initialSlots: ParkingSlot[] = Array.from({ length: TOTAL_SLOTS }, (_, i) => {
-      const isOccupied = Math.random() > 0.7; // Determine occupied state once
-      return {
-        id: i + 1,
-        label: `A-${i + 1}`,
-        status: isOccupied ? SlotStatus.OCCUPIED : SlotStatus.AVAILABLE,
-        floor: 1,
-        occupiedBy: isOccupied ? `KSA-${Math.floor(1000 + Math.random() * 9000)}` : undefined,
-        entryTime: isOccupied ? new Date(Date.now() - Math.floor(Math.random() * 3600000 * 2)) : undefined // Random time within last 2 hours
-      };
-    });
-    setSlots(initialSlots);
+    const storedSlots = localStorage.getItem('parking_slots');
+    const storedTrans = localStorage.getItem('parking_transactions');
+
+    if (storedSlots) {
+      // Restore Dates from string
+      const parsedSlots = JSON.parse(storedSlots).map((s: any) => ({
+        ...s,
+        entryTime: s.entryTime ? new Date(s.entryTime) : undefined
+      }));
+      setSlots(parsedSlots);
+    } else {
+      // First time initialization
+      const initialSlots: ParkingSlot[] = Array.from({ length: TOTAL_SLOTS }, (_, i) => {
+        const isOccupied = Math.random() > 0.7; 
+        return {
+          id: i + 1,
+          label: `A-${i + 1}`,
+          status: isOccupied ? SlotStatus.OCCUPIED : SlotStatus.AVAILABLE,
+          floor: 1,
+          occupiedBy: isOccupied ? `KSA-${Math.floor(1000 + Math.random() * 9000)}` : undefined,
+          entryTime: isOccupied ? new Date(Date.now() - Math.floor(Math.random() * 3600000 * 2)) : undefined
+        };
+      });
+      setSlots(initialSlots);
+    }
+
+    if (storedTrans) {
+      const parsedTrans = JSON.parse(storedTrans).map((t: any) => ({
+        ...t,
+        entryTime: new Date(t.entryTime),
+        exitTime: t.exitTime ? new Date(t.exitTime) : undefined
+      }));
+      setTransactions(parsedTrans);
+    }
   }, []);
+
+  // Save to LocalStorage whenever state changes
+  useEffect(() => {
+    if (slots.length > 0) {
+      localStorage.setItem('parking_slots', JSON.stringify(slots));
+    }
+  }, [slots]);
+
+  useEffect(() => {
+    if (transactions.length > 0) {
+      localStorage.setItem('parking_transactions', JSON.stringify(transactions));
+    }
+  }, [transactions]);
+
+  useEffect(() => {
+    localStorage.setItem('parking_rate', JSON.stringify(minuteRate));
+  }, [minuteRate]);
+
 
   const stats: ParkingStats = {
     totalSlots: slots.length,
@@ -50,7 +103,6 @@ export default function App() {
 
   const handleLaunch = (role: UserRole) => {
     setUserRole(role);
-    // If User/Driver logs in, send them to the Map or EntryExit, not dashboard
     setCurrentView(role === 'ADMIN' ? 'dashboard' : 'entry-exit');
     setShowLandingPage(false);
   };
@@ -89,7 +141,6 @@ export default function App() {
     setTimeout(() => setMessage(null), 3000);
   };
 
-  // Step 1: Request Exit - Calculates cost and opens Payment Modal
   const handleExitRequest = (plate: string) => {
     const slotIndex = slots.findIndex(s => s.occupiedBy === plate);
     if (slotIndex === -1) {
@@ -106,11 +157,10 @@ export default function App() {
     const entryTime = new Date(slot.entryTime);
     const exitTime = new Date();
     
-    // Calculate duration in minutes
     let durationMinutes = 0;
     try {
       const diffMs = exitTime.getTime() - entryTime.getTime();
-      durationMinutes = Math.max(1, Math.ceil(diffMs / (1000 * 60))); // Minimum 1 minute
+      durationMinutes = Math.max(1, Math.ceil(diffMs / (1000 * 60))); 
     } catch (e) {
       console.error("Error calculating time", e);
       durationMinutes = 1; 
@@ -118,7 +168,6 @@ export default function App() {
 
     const cost = durationMinutes * minuteRate;
 
-    // Open Payment Modal
     setPendingPayment({
       plateNumber: plate,
       entryTime,
@@ -127,11 +176,10 @@ export default function App() {
       ratePerMinute: minuteRate,
       totalCost: cost,
       slotLabel: slot.label,
-      slotIndex: slotIndex // Keep track of which slot to free
+      slotIndex: slotIndex
     });
   };
 
-  // Step 2: Confirm Payment - Actually frees the slot
   const confirmPayment = () => {
     if (!pendingPayment) return;
 
@@ -176,13 +224,12 @@ export default function App() {
       case 'dashboard':
         return userRole === 'ADMIN' ? (
           <div className="space-y-8 animate-in fade-in duration-500">
-            {/* Top Stats Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <StatCard 
                 title="إجمالي المواقف" 
                 value={stats.totalSlots} 
                 icon={Car} 
-                trend="+2 مواقف جديدة" 
+                trend="تحديث تلقائي" 
                 trendUp={true}
                 color="blue" 
               />
@@ -206,7 +253,7 @@ export default function App() {
                 title="إيرادات اليوم" 
                 value={`${stats.revenue.toLocaleString()} ج.س`} 
                 icon={DollarSign} 
-                trend="تحديث مباشر" 
+                trend="تراكمي" 
                 trendUp={true}
                 color="amber" 
               />
@@ -217,9 +264,7 @@ export default function App() {
                  <ParkingMap slots={slots} minuteRate={minuteRate} />
                </div>
                
-               {/* Sidebar Widgets */}
                <div className="space-y-6">
-                 {/* Live Activity Feed */}
                  <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 h-full">
                    <div className="flex justify-between items-center mb-6">
                      <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
@@ -322,7 +367,7 @@ export default function App() {
           <div className="flex items-center gap-4">
              <div className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100 flex items-center gap-2">
                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-               <span className="text-sm font-bold text-emerald-700">النظام متصل</span>
+               <span className="text-sm font-bold text-emerald-700">النظام متصل (تم الحفظ)</span>
              </div>
              <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center border border-slate-200">
                 <span className="font-bold text-slate-600">{userRole === 'ADMIN' ? 'A' : 'U'}</span>
@@ -336,7 +381,6 @@ export default function App() {
   );
 }
 
-// Updated Modern Stat Card
 const StatCard = ({ title, value, icon: Icon, trend, trendUp, color }: any) => {
   const colorStyles: any = {
     blue: "bg-blue-50 text-blue-600 border-blue-100",
@@ -366,7 +410,6 @@ const StatCard = ({ title, value, icon: Icon, trend, trendUp, color }: any) => {
         <p className="text-slate-400 font-medium text-sm">{title}</p>
       </div>
 
-      {/* Decorative background shape */}
       <div className={`absolute -right-6 -bottom-6 w-24 h-24 rounded-full opacity-5 group-hover:scale-110 transition-transform duration-500 ${iconBg.split(' ')[0].replace('bg-', 'bg-')}`}></div>
     </div>
   );
